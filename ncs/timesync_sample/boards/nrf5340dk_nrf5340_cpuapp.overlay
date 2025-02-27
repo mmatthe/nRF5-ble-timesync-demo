@@ -1,4 +1,4 @@
-gpio_fwd: nrf-gpio-forwarder {
+/*gpio_fwd: nrf-gpio-forwarder {
     compatible = "nordic,nrf-gpio-forwarder";
     status = "okay";
     sync-pin {
@@ -10,4 +10,20 @@ gpio_fwd: nrf-gpio-forwarder {
     leds {
         gpios = <&gpio0 28 0>, <&gpio0 29 0>, <&gpio0 30 0>, <&gpio0 31 0>;
     };
+};
+*/
+
+
+/ {
+	sync_pin {
+		compatible = "gpio-keys";
+		sync_pin0: sync_pin_0 {
+			gpios = <&gpio1 14 (GPIO_ACTIVE_HIGH)>;	/* P1.14 */
+			label = "SYNC_PIN";
+		};
+	};
+
+	aliases {
+		syncpin = &sync_pin0;
+	};
 };

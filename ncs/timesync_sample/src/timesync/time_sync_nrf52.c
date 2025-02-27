@@ -198,7 +198,7 @@ ISR_DIRECT_DECLARE(swi_isr)
 
 			__ASSERT_NO_MSG(signal_type < ARRAY_SIZE(signal_type_str));
 
-			LOG_INF("Signal: %s", signal_type_str[signal_type]);
+			//LOG_INF("Signal: %s", signal_type_str[signal_type]);
 
 			switch (signal_type) {
 			case MPSL_TIMESLOT_SIGNAL_SESSION_IDLE:
@@ -383,6 +383,14 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
 	uint32_t input_data_len;
 
 	mpsl_timeslot_signal_return_param_t *p_ret_val = NULL;
+	/* if (p_ret_val == NULL) { */
+	/* 	signal_callback_return_param.callback_action = */
+	/* 		MPSL_TIMESLOT_SIGNAL_ACTION_NONE; */
+	/* 	signal_callback_return_param.params.request.p_next = */
+	/* 				&m_timeslot_req_normal; */
+	/* 	p_ret_val = &signal_callback_return_param; */
+	/* } */
+	/* return p_ret_val; */
 
 	switch (signal_type) {
 
@@ -1165,6 +1173,7 @@ int ts_enable(const ts_rf_config_t* p_rf_config)
 		return -ENODEV;
 	}
 
+
 	sys_notify_init_spinwait(&clk_cli.notify);
 
 	err = onoff_request(clk_mgr, &clk_cli);
@@ -1197,11 +1206,14 @@ int ts_enable(const ts_rf_config_t* p_rf_config)
 	m_radio_state              = RADIO_STATE_IDLE;
 
 	atomic_clear(&m_send_sync_pkt);
+	//return 0;
 
 	timestamp_counter_start();
 	ppi_sync_timer_clear_configure();
 	sync_timer_start();
+	//return 0;
 
+	//return 0;
 	err = mpsl_timeslot_session_open(
 		mpsl_timeslot_callback,
 		&session_id);
@@ -1209,6 +1221,7 @@ int ts_enable(const ts_rf_config_t* p_rf_config)
 		LOG_ERR("mpsl_timeslot_session_open=%d", err);
 		return err;
 	}
+	LOG_INF("TS open!");
 
 	err = mpsl_timeslot_request(
 		session_id,

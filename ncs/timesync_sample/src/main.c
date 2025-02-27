@@ -56,6 +56,9 @@ static struct bt_conn *auth_conn;
 static bool m_gpio_trigger_enabled;
 static bool m_send_sync_pkt;
 
+#define SW0_NODE DT_ALIAS(mybutton)
+static const struct gpio_dt_spec my_time_button = GPIO_DT_SPEC_GET(SW0_NODE, gpios);
+
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
@@ -151,6 +154,26 @@ static void configure_gpio(void)
 	if (err) {
 		LOG_ERR("Cannot init LEDs (err: %d)", err);
 	}
+
+	gpio_pin_configure_dt(&my_time_button, GPIO_INPUT);
+}
+
+uint64_t nextFullSecondTick(void) {
+	uint64_t time_now_ticks;
+	uint32_t time_now_msec;
+	uint32_t time_target;
+	int err;
+
+	// Round up to nearest second to next 1000 ms to start toggling.
+	// If the receiver has received a valid sync packet within this time, the GPIO toggling polarity will be the same.
+
+	time_now_ticks = ts_timestamp_get_ticks_u64();
+	time_now_msec = TIME_SYNC_TIMESTAMP_TO_USEC(time_now_ticks) / 1000;
+	uint32_t time_target_ms = (time_now_msec / 1000 + 10) * 1000;
+	return TIME_SYNC_MSEC_TO_TICK(time_target_ms);
+
+	/* time_target = TIME_SYNC_MSEC_TO_TICK(time_now_msec) + (1000 * 2); */
+	/* time_target = (time_target / 1000) * 1000; */
 }
 
 static void ts_gpio_trigger_enable(void)
@@ -173,12 +196,15 @@ static void ts_gpio_trigger_enable(void)
 	time_target = TIME_SYNC_MSEC_TO_TICK(time_now_msec) + (1000 * 2);
 	time_target = (time_target / 1000) * 1000;
 
+	time_target = nextFullSecondTick();
+
 #if defined(DPPI_PRESENT)
 	err = ts_set_trigger(time_target, dppi_channel_syncpin);
 	__ASSERT_NO_MSG(err == 0);
 #else
 	err = ts_set_trigger(time_target, nrfx_gpiote_out_task_address_get(&gpiote_inst, syncpin_absval));
 	__ASSERT_NO_MSG(err == 0);
+
 #endif
 
 	nrfx_gpiote_set_task_trigger(&gpiote_inst, syncpin_absval);
@@ -195,6 +221,9 @@ static void ts_event_handler(const ts_evt_t* evt)
 {
 	switch (evt->type)
 	{
+		case TS_EVT_TIMESTAMP:
+			LOG_INF("TS!! %lld", evt->params.timestamp);
+			break;
 		case TS_EVT_SYNCHRONIZED:
 			ts_gpio_trigger_enable();
 			LOG_INF("TS_EVT_SYNCHRONIZED");
@@ -204,6 +233,7 @@ static void ts_event_handler(const ts_evt_t* evt)
 			LOG_INF("TS_EVT_DESYNCHRONIZED");
 			break;
 		case TS_EVT_TRIGGERED:
+			//LOG_INF("TRiggered! %d", evt->params.triggered.tick_target);
 			if (m_gpio_trigger_enabled)
 			{
 				uint32_t tick_target;
@@ -213,7 +243,10 @@ static void ts_event_handler(const ts_evt_t* evt)
 				 * That is, an update from the timing transmitter that causes a jump larger than the
 				 * chosen increment, risk having a trigger target_tick that is in the past.
 				 */
-				tick_target = evt->params.triggered.tick_target + 2;
+				//tick_target = evt->params.triggered.tick_target + 2;
+				tick_target = nextFullSecondTick();
+				uint64_t now = ts_timestamp_get_ticks_u64();
+				LOG_INF("Next trigger at %d. Time: %lld", tick_target, now);
 
 #if defined(DPPI_PRESENT)
 				err = ts_set_trigger(tick_target, dppi_channel_syncpin);
@@ -281,6 +314,7 @@ static void configure_sync_timer(void)
 		.rf_addr = { 0xDE, 0xAD, 0xBE, 0xEF, 0x19 }
 	};
 
+	LOG_INF("BEfore enable");
 	err = ts_enable(&rf_config);
 	__ASSERT_NO_MSG(err == 0);
 }
@@ -336,6 +370,7 @@ static void configure_debug_gpio(void)
 	nrfx_gpiote_out_task_enable(&gpiote_inst, syncpin_absval);
 
 #if defined(DPPI_PRESENT)
+	#error stuff
 	nrfx_err = nrfx_dppi_channel_alloc(&dppi_channel_syncpin);
 	__ASSERT_NO_MSG(nrfx_err == NRFX_SUCCESS);
 
@@ -378,6 +413,24 @@ int main(void)
 	if (err) {
 		LOG_ERR("Advertising failed to start (err %d)", err);
 		return 0;
+	}
+
+	int state = 0;
+	while (true) {
+		//err = ts_set_timestamp_trigger(nrfx_gpiote_out_task_address_get(&gpiote_inst, syncpin_absval));
+		//__ASSERT_NO_MSG(err == 0);
+		int btnVal = gpio_pin_get_dt(&my_time_button);
+		if (btnVal == 1 && state == 0) {
+			state = 1;
+			uint64_t timestamp_ticks = ts_timestamp_get_ticks_u64();
+			uint32_t timestamp_msec = TIME_SYNC_TIMESTAMP_TO_USEC(timestamp_ticks) / 1000;
+			LOG_INF("Still running... %d", timestamp_msec);
+		}
+		if (btnVal == 0) {
+			state = 0;
+		}
+		//LOG_INF("Button: %d", gpio_pin_get_dt(&my_time_button));
+		k_msleep(1);
 	}
 }
 

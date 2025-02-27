@@ -1,0 +1,19 @@
+/ {
+	sync_pin {
+		compatible = "gpio-keys";
+		sync_pin0: sync_pin_0 {
+			gpios = <&gpio1 10 (GPIO_ACTIVE_HIGH)>;	/* P1.14 */
+			label = "SYNC_PIN";
+		};
+
+        mybutton0: mybutton_0 {
+          gpios = <&gpio0 13 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+          label = "My Button";
+        };
+	};
+
+	aliases {
+		syncpin = &sync_pin0;
+        mybutton = &mybutton0;
+	};
+};
