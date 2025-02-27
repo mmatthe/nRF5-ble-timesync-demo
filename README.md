@@ -1,4 +1,7 @@
 # nRF5-ble-timesync-demo
+## Max:
+Connect GPIO 0.13 of two or multiple NRF dongles to a switch towards ground. press switch and common timing is shown in the consoles.
+
 nRF52 clock synchronization demo code
 
 ## SDK version
